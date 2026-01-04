@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "node esbuild.config.mjs production"
+    "build": "node esbuild.config.mjs production",
+    "version": "node esbuild.config.mjs production"
   },
   "keywords": [
     "obsidian",
@@ -14,8 +15,13 @@
     "time",
     "formatting"
   ],
-  "author": "",
+  "author": "dylanchid",
+  "authorUrl": "https://github.com/dylanchid",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dylanchid/thymestamp"
+  },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "builtin-modules": "^3.3.0",

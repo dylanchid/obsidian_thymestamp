@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, TextComponent, DropdownComponent, Notice } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type ThymestampPlugin from './main';
 import { TimestampFormat, OutputMode, DEFAULT_FORMATS } from './types';
 import { parsePattern, getTokensByCategory } from './tokens';
@@ -109,12 +109,10 @@ export class ThymestampSettingTab extends PluginSettingTab {
         }));
 
     // Format pattern with live preview
-    let patternInput: TextComponent;
     const patternSetting = new Setting(formatDiv)
       .setName('Pattern')
       .setDesc('Token pattern for this format')
       .addText(text => {
-        patternInput = text;
         text
           .setPlaceholder('{day}, {month} {date}')
           .setValue(format.pattern)

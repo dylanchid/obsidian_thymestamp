@@ -1,4 +1,4 @@
-import { Plugin, MarkdownView, Notice, Editor } from 'obsidian';
+import { Plugin, MarkdownView, Notice, Editor, Menu } from 'obsidian';
 import { ThymestampSettings, TimestampFormat, DEFAULT_SETTINGS } from './types';
 import { parsePattern } from './tokens';
 import { ThymestampSettingTab } from './settings';
@@ -122,7 +122,7 @@ export default class ThymestampPlugin extends Plugin {
     const editor = view?.editor;
 
     // Create a quick picker using a modal-like approach
-    const menu = new (require('obsidian').Menu)();
+    const menu = new Menu();
 
     this.settings.formats.forEach(format => {
       const locale = navigator.language || 'en-US';
