@@ -1,0 +1,41 @@
+{
+  "formats": [
+    {
+      "id": "journal-header",
+      "name": "Standard",
+      "pattern": "{day}, {month} {date}. {hours}:{minutes} {period}",
+      "outputMode": "insert"
+    },
+    {
+      "id": "date-simple",
+      "name": "Simple Date",
+      "pattern": "{month} {date}, {year}",
+      "outputMode": "insert"
+    },
+    {
+      "id": "date-iso",
+      "name": "ISO Date",
+      "pattern": "{year}-{month-pad}-{date-pad}",
+      "outputMode": "insert"
+    },
+    {
+      "id": "time-12h",
+      "name": "Time (12h)",
+      "pattern": "{hours}:{minutes} {period}",
+      "outputMode": "insert"
+    },
+    {
+      "id": "time-24h",
+      "name": "Time (24h)",
+      "pattern": "{hours24-pad}:{minutes}",
+      "outputMode": "insert"
+    },
+    {
+      "id": "full-datetime",
+      "name": "Full DateTime",
+      "pattern": "{day}, {month} {date-ord}, {year} at {hours}:{minutes} {period}",
+      "outputMode": "insert"
+    }
+  ],
+  "lastUsedFormatId": "journal-header"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "thymestamp",
+  "name": "Thymestamp",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Insert custom-formatted timestamps using tokens. Create multiple formats with their own hotkeys.",
+  "author": "",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
