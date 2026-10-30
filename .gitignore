@@ -1,24 +1,5 @@
-# Dependencies
 node_modules/
-
-# Build outputs
-main.js
-*.js.map
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Local data
-data.json
-
-# Logs
 *.log
-npm-debug.log*
+data.json
+*.js.map

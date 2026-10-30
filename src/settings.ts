@@ -1,7 +1,9 @@
-import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice, TextAreaComponent } from 'obsidian';
 import type ThymestampPlugin from './main';
 import { TimestampFormat, OutputMode, DEFAULT_FORMATS } from './types';
 import { parsePattern, getTokensByCategory } from './tokens';
+import { PresetLibraryModal } from './preset-library-modal';
+import { NaturalFormatParser } from './natural-parser';
 
 export class ThymestampSettingTab extends PluginSettingTab {
   plugin: ThymestampPlugin;
@@ -17,6 +19,59 @@ export class ThymestampSettingTab extends PluginSettingTab {
 
     containerEl.createEl('h1', { text: 'Thymestamp Settings' });
 
+    // General settings
+    containerEl.createEl('h2', { text: 'General' });
+
+    new Setting(containerEl)
+      .setName('Show previews in picker')
+      .setDesc('Display timestamp previews in the format picker modal')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.showPreviewsInPicker)
+        .onChange(async (value) => {
+          this.plugin.settings.showPreviewsInPicker = value;
+          await this.plugin.saveSettings();
+        }));
+
+    // Import/Export section
+    containerEl.createEl('h2', { text: 'Import/Export' });
+
+    new Setting(containerEl)
+      .setName('Export formats')
+      .setDesc('Export all your formats as JSON')
+      .addButton(button => button
+        .setButtonText('Export')
+        .onClick(() => {
+          const json = this.plugin.exportFormats();
+          navigator.clipboard.writeText(json);
+          new Notice('Formats copied to clipboard!');
+        }));
+
+    new Setting(containerEl)
+      .setName('Import formats')
+      .setDesc('Import formats from JSON (paste in textarea below and click Import)')
+      .addTextArea(text => {
+        text.setPlaceholder('Paste JSON here...');
+        text.inputEl.rows = 6;
+        text.inputEl.addClass('thymestamp-import-textarea');
+        return text;
+      })
+      .addButton(button => button
+        .setButtonText('Import')
+        .setCta()
+        .onClick(async () => {
+          const textarea = containerEl.querySelector('.thymestamp-import-textarea') as HTMLTextAreaElement;
+          if (textarea && textarea.value) {
+            const success = this.plugin.importFormats(textarea.value);
+            if (success) {
+              new Notice('Formats imported successfully!');
+              textarea.value = '';
+              this.display();
+            }
+          } else {
+            new Notice('Please paste JSON data first');
+          }
+        }));
+
     // Formats section
     containerEl.createEl('h2', { text: 'Timestamp Formats' });
     containerEl.createEl('p', {
@@ -24,10 +79,10 @@ export class ThymestampSettingTab extends PluginSettingTab {
       cls: 'setting-item-description'
     });
 
-    // Add new format button
-    new Setting(containerEl)
-      .setName('Add New Format')
-      .setDesc('Create a new timestamp format')
+    // Action buttons row
+    const actionsContainer = containerEl.createDiv('thymestamp-actions-row');
+
+    new Setting(actionsContainer)
       .addButton(button => button
         .setButtonText('+ Add Format')
         .setCta()
@@ -37,17 +92,22 @@ export class ThymestampSettingTab extends PluginSettingTab {
             name: 'New Format',
             pattern: '{day}, {month} {date}',
             outputMode: 'insert',
+            usageCount: 0,
+            isFavorite: false,
           };
           this.plugin.settings.formats.push(newFormat);
           await this.plugin.saveSettings();
           this.plugin.registerFormatCommand(newFormat);
           this.display();
-        }));
-
-    // Reset to defaults button
-    new Setting(containerEl)
-      .setName('Reset to Defaults')
-      .setDesc('Restore the default format presets')
+        }))
+      .addButton(button => button
+        .setButtonText('📚 Browse Presets')
+        .onClick(() => {
+          new PresetLibraryModal(this.app, (preset) => {
+            this.plugin.addFormatFromPreset(preset);
+            this.display();
+          }).open();
+        }))
       .addButton(button => button
         .setButtonText('Reset')
         .setWarning()
@@ -79,12 +139,46 @@ export class ThymestampSettingTab extends PluginSettingTab {
   private renderFormatSettings(container: HTMLElement, format: TimestampFormat, index: number): void {
     const formatDiv = container.createDiv('thymestamp-format-item');
 
-    // Format header with delete button
+    // Format header with actions
     const headerDiv = formatDiv.createDiv('thymestamp-format-header');
-    headerDiv.createEl('h3', { text: `Format ${index + 1}` });
+    
+    const headerLeft = headerDiv.createDiv('thymestamp-format-header-left');
+    headerLeft.createEl('h3', { text: `Format ${index + 1}` });
+    
+    // Favorite star
+    const favoriteBtn = headerLeft.createEl('button', {
+      text: format.isFavorite ? '⭐' : '☆',
+      cls: 'thymestamp-favorite-btn',
+      attr: { 'aria-label': 'Toggle favorite' }
+    });
+    favoriteBtn.addEventListener('click', async () => {
+      this.plugin.toggleFormatFavorite(format.id);
+      this.display();
+    });
+
+    // Usage count badge
+    if (format.usageCount && format.usageCount > 0) {
+      headerLeft.createSpan({
+        text: `${format.usageCount} uses`,
+        cls: 'thymestamp-usage-badge'
+      });
+    }
+
+    const headerRight = headerDiv.createDiv('thymestamp-format-header-right');
+    
+    // Duplicate button
+    const duplicateBtn = headerRight.createEl('button', {
+      text: 'Duplicate',
+      cls: 'thymestamp-action-btn'
+    });
+    duplicateBtn.addEventListener('click', async () => {
+      this.plugin.duplicateFormat(format.id);
+      this.display();
+      new Notice(`Duplicated "${format.name}"`);
+    });
 
     // Delete button
-    const deleteBtn = headerDiv.createEl('button', {
+    const deleteBtn = headerRight.createEl('button', {
       text: 'Delete',
       cls: 'mod-warning'
     });
@@ -108,10 +202,26 @@ export class ThymestampSettingTab extends PluginSettingTab {
           this.plugin.reloadCommands();
         }));
 
+    // Category selection
+    new Setting(formatDiv)
+      .setName('Category')
+      .setDesc('Organize formats by category')
+      .addDropdown(dropdown => {
+        dropdown.addOption('', 'None');
+        this.plugin.settings.categories.forEach(cat => {
+          dropdown.addOption(cat.id, cat.name);
+        });
+        dropdown.setValue(format.category || '');
+        dropdown.onChange(async (value) => {
+          format.category = value || undefined;
+          await this.plugin.saveSettings();
+        });
+      });
+
     // Format pattern with live preview
     const patternSetting = new Setting(formatDiv)
       .setName('Pattern')
-      .setDesc('Token pattern for this format')
+      .setDesc('Token pattern for this format. Validation will show below.')
       .addText(text => {
         text
           .setPlaceholder('{day}, {month} {date}')
@@ -120,9 +230,14 @@ export class ThymestampSettingTab extends PluginSettingTab {
             format.pattern = value;
             await this.plugin.saveSettings();
             this.updatePreview(previewEl, value);
+            this.updateValidation(validationEl, value);
           });
         text.inputEl.addClass('thymestamp-pattern-input');
       });
+
+    // Pattern validation
+    const validationEl = formatDiv.createDiv('thymestamp-validation');
+    this.updateValidation(validationEl, format.pattern);
 
     // Live preview
     const previewEl = formatDiv.createDiv('thymestamp-preview');
@@ -148,6 +263,23 @@ export class ThymestampSettingTab extends PluginSettingTab {
     previewEl.empty();
     previewEl.createSpan({ text: 'Preview: ', cls: 'thymestamp-preview-label' });
     previewEl.createSpan({ text: preview, cls: 'thymestamp-preview-value' });
+  }
+
+  private updateValidation(validationEl: HTMLElement, pattern: string): void {
+    const result = NaturalFormatParser.validatePattern(pattern);
+    validationEl.empty();
+
+    if (result.valid) {
+      validationEl.createSpan({
+        text: '✓ Valid pattern',
+        cls: 'thymestamp-validation-success'
+      });
+    } else {
+      validationEl.createSpan({
+        text: '✗ Invalid tokens: ' + result.errors.join(', '),
+        cls: 'thymestamp-validation-error'
+      });
+    }
   }
 
   private renderTokenReference(container: HTMLElement): void {

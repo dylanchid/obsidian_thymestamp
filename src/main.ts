@@ -1,7 +1,9 @@
-import { Plugin, MarkdownView, Notice, Editor, Menu } from 'obsidian';
-import { ThymestampSettings, TimestampFormat, DEFAULT_SETTINGS } from './types';
+import { Plugin, MarkdownView, Notice, Editor } from 'obsidian';
+import { ThymestampSettings, TimestampFormat, DEFAULT_SETTINGS, FormatPreset } from './types';
 import { parsePattern } from './tokens';
 import { ThymestampSettingTab } from './settings';
+import { FormatPickerModal } from './format-picker-modal';
+import { PresetLibraryModal } from './preset-library-modal';
 
 export default class ThymestampPlugin extends Plugin {
   settings: ThymestampSettings;
@@ -18,7 +20,7 @@ export default class ThymestampPlugin extends Plugin {
     this.registerAllCommands();
 
     // Add ribbon icon for quick access
-    this.ribbonIconEl = this.addRibbonIcon('clock', 'Insert Timestamp', (evt) => {
+    this.ribbonIconEl = this.addRibbonIcon('clock', 'Insert Timestamp', () => {
       this.insertLastUsedFormat();
     });
 
@@ -28,6 +30,15 @@ export default class ThymestampPlugin extends Plugin {
       name: 'Pick timestamp format',
       callback: () => {
         this.openFormatPicker();
+      }
+    });
+
+    // Register command to browse preset library
+    this.addCommand({
+      id: 'browse-preset-library',
+      name: 'Browse format presets',
+      callback: () => {
+        this.openPresetLibrary();
       }
     });
   }
@@ -78,6 +89,9 @@ export default class ThymestampPlugin extends Plugin {
     const locale = navigator.language || 'en-US';
     const timestamp = parsePattern(format.pattern, new Date(), locale);
 
+    // Increment usage count
+    format.usageCount = (format.usageCount || 0) + 1;
+
     // Update last used format
     this.settings.lastUsedFormatId = format.id;
     this.saveSettings();
@@ -100,6 +114,8 @@ export default class ThymestampPlugin extends Plugin {
           // Fallback to clipboard if no editor
           navigator.clipboard.writeText(timestamp).then(() => {
             new Notice(`No editor active. Copied: ${timestamp}`);
+          }).catch(() => {
+            new Notice('Failed to copy to clipboard');
           });
         }
       }
@@ -121,40 +137,96 @@ export default class ThymestampPlugin extends Plugin {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     const editor = view?.editor;
 
-    // Create a quick picker using a modal-like approach
-    const menu = new Menu();
+    const modal = new FormatPickerModal(
+      this.app,
+      this.settings.formats,
+      (format) => {
+        this.executeFormat(format, editor);
+      },
+      this.settings.showPreviewsInPicker
+    );
 
-    this.settings.formats.forEach(format => {
-      const locale = navigator.language || 'en-US';
-      const preview = parsePattern(format.pattern, new Date(), locale);
+    modal.open();
+  }
 
-      menu.addItem((item: any) => {
-        item
-          .setTitle(`${format.name}`)
-          .setSection('formats')
-          .onClick(() => {
-            this.executeFormat(format, editor);
-          });
+  private openPresetLibrary() {
+    const modal = new PresetLibraryModal(this.app, (preset: FormatPreset) => {
+      this.addFormatFromPreset(preset);
+    });
+
+    modal.open();
+  }
+
+  addFormatFromPreset(preset: FormatPreset) {
+    const newFormat: TimestampFormat = {
+      id: `format-${Date.now()}`,
+      name: preset.name,
+      pattern: preset.pattern,
+      outputMode: 'insert',
+      category: preset.category,
+      usageCount: 0,
+      isFavorite: false,
+    };
+
+    this.settings.formats.push(newFormat);
+    this.saveSettings();
+    this.registerFormatCommand(newFormat);
+  }
+
+  toggleFormatFavorite(formatId: string) {
+    const format = this.settings.formats.find(f => f.id === formatId);
+    if (format) {
+      format.isFavorite = !format.isFavorite;
+      this.saveSettings();
+    }
+  }
+
+  duplicateFormat(formatId: string) {
+    const format = this.settings.formats.find(f => f.id === formatId);
+    if (format) {
+      const duplicate: TimestampFormat = {
+        ...format,
+        id: `format-${Date.now()}`,
+        name: `${format.name} (Copy)`,
+        usageCount: 0,
+      };
+      this.settings.formats.push(duplicate);
+      this.saveSettings();
+      this.registerFormatCommand(duplicate);
+    }
+  }
+
+  exportFormats(): string {
+    return JSON.stringify(this.settings.formats, null, 2);
+  }
+
+  importFormats(jsonData: string): boolean {
+    try {
+      const formats = JSON.parse(jsonData) as TimestampFormat[];
+
+      if (!Array.isArray(formats)) {
+        throw new Error('Invalid format: expected an array');
+      }
+
+      formats.forEach(format => {
+        if (!format.id || !format.name || !format.pattern) {
+          throw new Error('Invalid format structure');
+        }
+
+        // Ensure format has required fields
+        format.id = `format-${Date.now()}-${Math.random()}`;
+        format.usageCount = 0;
+
+        this.settings.formats.push(format);
+        this.registerFormatCommand(format);
       });
-    });
 
-    menu.addSeparator();
-    menu.addItem((item: any) => {
-      item
-        .setTitle('Open Settings')
-        .setIcon('settings')
-        .onClick(() => {
-          (this.app as any).setting.open();
-          (this.app as any).setting.openTabById('thymestamp');
-        });
-    });
-
-    // Position the menu near the ribbon icon or center of screen
-    const rect = this.ribbonIconEl?.getBoundingClientRect();
-    if (rect) {
-      menu.showAtPosition({ x: rect.left, y: rect.top });
-    } else {
-      menu.showAtPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+      this.saveSettings();
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      new Notice(`Import failed: ${errorMessage}`);
+      return false;
     }
   }
 }

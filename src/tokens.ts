@@ -326,7 +326,10 @@ export function getTokensByCategory(): Map<string, TokenDefinition[]> {
     if (!categories.has(def.category)) {
       categories.set(def.category, []);
     }
-    categories.get(def.category)!.push(def);
+    const categoryDefs = categories.get(def.category);
+    if (categoryDefs) {
+      categoryDefs.push(def);
+    }
   });
 
   return categories;
