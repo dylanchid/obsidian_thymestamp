@@ -42,10 +42,9 @@ Insert custom-formatted timestamps into your Obsidian notes with powerful token-
 
 ## Installation
 
-1. Open Obsidian Settings → Community plugins
-2. Search for "Thymestamp"
-3. Click Install
-4. Enable the plugin in the Community plugins list
+1. Download this repository and run `npm install` followed by `npm run build`.
+2. Copy `manifest.json`, `main.js`, and `styles.css` into `<vault>/.obsidian/plugins/thymestamp/`.
+3. Enable Thymestamp in Obsidian Settings → Community plugins.
 
 ## Usage
 

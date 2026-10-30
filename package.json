@@ -1,6 +1,6 @@
 {
   "name": "thymestamp",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Custom timestamp formats with tokens and hotkeys for Obsidian",
   "main": "main.js",
   "scripts": {
@@ -20,7 +20,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dylanchid/thymestamp"
+    "url": "https://github.com/dylanchid/obsidian_thymestamp"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
